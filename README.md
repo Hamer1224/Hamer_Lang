@@ -5,8 +5,11 @@ H@mer is a high-performance, entropy-driven systems programming language built s
 
 ## ​Key Features
 ​. Entropy-Driven Logic: Native probabilistic branching using the hardware cycle counter (?<%10>).
+
 ​. Kernel-Level I/O: No standard library. Every print and rest command is a direct Linux syscall.
+
 . ​Dynamic Memory: Custom heap allocation using mmap syscalls.
+
 ​. Inline Assembly: First-class support for raw ARM64 assembly blocks with @asm is ... done.
 
 ## Example Syntax
@@ -30,6 +33,9 @@ ld out.o -o hamer_prog
 
 ## Project Structure
 . ​src/lexer.rs: Tokenizes the source code.
+
 . ​src/parser.rs: Builds the Abstract Syntax Tree (AST).
+
 . ​src/generator.rs: Emits optimized ARM64 Assembly.
+
 . ​src/math.hmr: The hardware entropy library.

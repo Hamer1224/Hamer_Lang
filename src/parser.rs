@@ -13,10 +13,10 @@ pub enum Stmt {
     IfStmt { path: Vec<String>, op: Token, rhs_val: f64, body: Vec<Stmt> },
     ProbIf { chance: f64, body: Vec<Stmt> },
     WhileStmt { path: Vec<String>, op: Token, rhs_val: f64, body: Vec<Stmt> },
-    AsmBlock(String),      // ARM64
-    IntelBlock(String),    // x86_64
-    PythonBlock(String),   // Compile-time
-    MergeBlock(String),    // #filename file read
+    AsmBlock(String),      
+    IntelBlock(String),    
+    PythonBlock(String),   
+    MergeBlock(String),    
 }
 
 pub struct Parser { pub tokens: Vec<Token>, pub pos: usize }
@@ -54,8 +54,8 @@ impl Parser {
 
     fn parse_statement(&mut self) -> Stmt {
         match self.peek() {
-            // #filename: File Read merge
-            Token::Hash => {
+            // Get <filename>: Modular File Inclusion
+            Token::Get => {
                 self.advance();
                 let filename = if let Token::Identifier(s) = self.advance() { s } else { "lib".into() };
                 let path = format!("{}.hmr", filename);
@@ -64,7 +64,7 @@ impl Parser {
                     Err(_) => Stmt::AsmBlock(format!("// Error: Could not read {}.hmr", filename)),
                 }
             }
-            // @ symbols: asm, intel, python, merge
+            // @ symbols: asm, intel, python
             Token::At => {
                 self.advance();
                 match self.peek() {
@@ -111,12 +111,6 @@ impl Parser {
                         }
                         self.advance(); // done
                         Stmt::AsmBlock(code)
-                    }
-                    Token::Identifier(s) => {
-                        self.advance();
-                        let path = format!("{}.hmr", s);
-                        let content = fs::read_to_string(path).unwrap_or_default();
-                        Stmt::MergeBlock(content)
                     }
                     _ => Stmt::AsmBlock("nop".into())
                 }

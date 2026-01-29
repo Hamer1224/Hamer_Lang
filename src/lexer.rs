@@ -3,7 +3,7 @@ pub enum Token {
     Class, Is, Done, Local, Print, Get, At, Assign, Dot, New,
     If, Then, While, Do, Greater, Less, Equal,
     Plus, Minus, Star, Slash, Comma, Rest,
-    Quest, Percent, LeftBracket, RightBracket, Hash,
+    Quest, Percent, LeftBracket, RightBracket,
     Identifier(String), Number(f64), StringLit(String), EOF,
 }
 
@@ -20,7 +20,6 @@ impl Lexer {
         if self.pos >= self.input.len() { return Token::EOF; }
         let ch = self.input[self.pos];
         match ch {
-            '#' => { self.pos += 1; Token::Hash },
             '?' => { self.pos += 1; Token::Quest },
             '%' => { self.pos += 1; Token::Percent },
             '@' => { self.pos += 1; Token::At },
@@ -52,11 +51,19 @@ impl Lexer {
         while self.pos < self.input.len() && (self.input[self.pos].is_alphanumeric() || self.input[self.pos] == '_') {
             ident.push(self.input[self.pos]); self.pos += 1;
         }
-        match ident.to_lowercase().as_str() {
-            "get" => Token::Get, "class" => Token::Class, "new" => Token::New,
-            "local" => Token::Local, "print" => Token::Print, "rest" => Token::Rest,
-            "if" => Token::If, "then" => Token::Then, "while" => Token::While,
-            "do" => Token::Do, "is" => Token::Is, "done" => Token::Done,
+        match ident.as_str() {
+            "Get" => Token::Get, // Case sensitive as requested
+            "class" => Token::Class, 
+            "new" => Token::New,
+            "local" => Token::Local, 
+            "print" => Token::Print, 
+            "rest" => Token::Rest,
+            "if" => Token::If, 
+            "then" => Token::Then, 
+            "while" => Token::While,
+            "do" => Token::Do, 
+            "is" => Token::Is, 
+            "done" => Token::Done,
             _ => Token::Identifier(ident),
         }
     }

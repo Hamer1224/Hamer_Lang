@@ -74,7 +74,6 @@ impl Generator {
                 let math_reg = self.symbols.get("math").cloned().unwrap_or("x12".into());
                 self.output.push_str(&format!("\n    // Chaos Roll {}%\n    ldr x1, [{}, #8]\n", chance, math_reg));
                 
-                // Fixed line: Wrapped in format! macro
                 self.output.push_str(&format!("    cmp x1, #0\n    b.ne .Lskp{}\n    mrs x1, cntvct_el0\n.Lskp{}:\n", id, id));
                 
                 self.output.push_str("    ldr x2, =0x9E3779B97F4A7C15\n    mul x1, x1, x2\n    eor x1, x1, x1, lsr #33\n");
@@ -84,11 +83,69 @@ impl Generator {
                 for s in body { self.gen_stmt(s); }
                 self.output.push_str(&format!(".Lif{}:\n", id));
             }
+            Stmt::IfStmt { path, op, rhs_val, body } => {
+                let id = self.label_count; self.label_count += 1;
+                let (reg, offset) = self.get_path_info(&path);
+                if path.len() > 1 {
+                    self.output.push_str(&format!("    ldr x1, [{}, #{}]\n", reg, offset));
+                } else {
+                    self.output.push_str(&format!("    mov x1, {}\n", reg));
+                }
+                let cond = match op {
+                    Token::Equal => "ne",
+                    Token::Greater => "le",
+                    Token::Less => "ge",
+                    _ => "eq",
+                };
+                self.output.push_str(&format!("    cmp x1, #{}\n    b.{} .Lif{}\n", rhs_val as i64, cond, id));
+                for s in body { self.gen_stmt(s); }
+                self.output.push_str(&format!(".Lif{}:\n", id));
+            }
+            Stmt::WhileStmt { path, op, rhs_val, body } => {
+                let id = self.label_count; self.label_count += 1;
+                self.output.push_str(&format!(".Lw_start{}:\n", id));
+                let (reg, offset) = self.get_path_info(&path);
+                if path.len() > 1 {
+                    self.output.push_str(&format!("    ldr x1, [{}, #{}]\n", reg, offset));
+                } else {
+                    self.output.push_str(&format!("    mov x1, {}\n", reg));
+                }
+                let cond = match op {
+                    Token::Equal => "ne",
+                    Token::Greater => "le",
+                    Token::Less => "ge",
+                    _ => "eq",
+                };
+                self.output.push_str(&format!("    cmp x1, #{}\n    b.{} .Lw_end{}\n", rhs_val as i64, cond, id));
+                for s in body { self.gen_stmt(s); }
+                self.output.push_str(&format!("    b .Lw_start{}\n.Lw_end{}:\n", id, id));
+            }
             Stmt::LocalAssign { name, value } => {
                 let reg = self.symbols.entry(name.clone()).or_insert_with(|| {
                     let r = format!("x{}", self.reg_count); self.reg_count += 1; r
                 }).clone();
                 self.output.push_str(&format!("    mov {}, #{}\n", reg, value as i64));
+            }
+            Stmt::FieldAssign { path, value } => {
+                let (reg, offset) = self.get_path_info(&path);
+                if path.len() > 1 {
+                    self.output.push_str(&format!("    mov x1, #{}\n    str x1, [{}, #{}]\n", value as i64, reg, offset));
+                } else {
+                    self.output.push_str(&format!("    mov {}, #{}\n", reg, value as i64));
+                }
+            }
+            Stmt::FieldMath { path, op, rhs_val } => {
+                let (reg, offset) = self.get_path_info(&path);
+                let instr = match op {
+                    Token::Plus => "add",
+                    Token::Minus => "sub",
+                    _ => "add",
+                };
+                if path.len() > 1 {
+                    self.output.push_str(&format!("    ldr x1, [{}, #{}]\n    {} x1, x1, #{}\n    str x1, [{}, #{}]\n", reg, offset, instr, rhs_val as i64, reg, offset));
+                } else {
+                    self.output.push_str(&format!("    {} {}, {}, #{}\n", instr, reg, reg, rhs_val as i64));
+                }
             }
             Stmt::PrintVar(name) => {
                 if let Some(reg) = self.symbols.get(&name).cloned() {
@@ -118,6 +175,11 @@ impl Generator {
     add sp, sp, #32
     ldp x0, x1, [sp], #16\n", reg, id, id));
                 }
+            }
+            Stmt::PrintString(s) => {
+                let id = self.label_count; self.label_count += 1;
+                self.output.push_str(&format!("\n.section .data\n.Lstr{}: .ascii \"{}\\n\"\n.section .text\n", id, s));
+                self.output.push_str(&format!("    mov x0, #1\n    adr x1, .Lstr{}\n    mov x2, #{}\n    mov x8, #64\n    svc #0\n", id, s.len() + 1));
             }
             Stmt::ClassDef { name, fields } => { self.class_map.insert(name, fields); }
             Stmt::HeapAlloc { var_name, class_name } => {

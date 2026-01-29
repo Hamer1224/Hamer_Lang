@@ -73,7 +73,10 @@ impl Generator {
                 let id = self.label_count; self.label_count += 1;
                 let math_reg = self.symbols.get("math").cloned().unwrap_or("x12".into());
                 self.output.push_str(&format!("\n    // Chaos Roll {}%\n    ldr x1, [{}, #8]\n", chance, math_reg));
-                self.output.push_str("    cmp x1, #0\n    b.ne .Lskp{}\n    mrs x1, cntvct_el0\n.Lskp{}:\n", id, id);
+                
+                // Fixed line: Wrapped in format! macro
+                self.output.push_str(&format!("    cmp x1, #0\n    b.ne .Lskp{}\n    mrs x1, cntvct_el0\n.Lskp{}:\n", id, id));
+                
                 self.output.push_str("    ldr x2, =0x9E3779B97F4A7C15\n    mul x1, x1, x2\n    eor x1, x1, x1, lsr #33\n");
                 self.output.push_str(&format!("    str x1, [{}, #8]\n", math_reg));
                 self.output.push_str("    and x1, x1, #0x7FFFFFFF\n    mov x2, #100\n    udiv x3, x1, x2\n    msub x1, x3, x2, x1\n");

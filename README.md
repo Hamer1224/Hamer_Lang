@@ -23,13 +23,7 @@ done
 ```
 
 ## Compilation Pipeline
-​H@mer compiles to ARM64 assembly, which is then handled by the GNU Assembler (as) and Linker (ld).
-```bash
-cargo run src/main.hmr
-as out.s -o out.o
-ld out.o -o hamer_prog
-./hamer_prog
-```
+​H@mer compiles to ARM64 and Intel assembly, which is then handled by the GNU Assembler (as) and Linker (ld).
 
 ## Project Structure
 . ​src/lexer.rs: Tokenizes the source code.

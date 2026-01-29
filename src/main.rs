@@ -1,87 +1,55 @@
+use std::env;
+use std::fs;
+use std::process;
+
 mod lexer;
 mod parser;
 mod generator;
 
-use std::env;
-use std::fs;
-use std::path::Path;
 use lexer::Lexer;
 use parser::Parser;
 use generator::Generator;
 
-/// This function ensures that any GET "lib" calls pull the library code
-/// and place it at the absolute beginning of the source stream.
-fn resolve_imports(content: String, base_path: &Path) -> String {
-    let mut imports_code = String::new();
-    let mut main_body_code = String::new();
-    let dir = base_path.parent().unwrap_or(Path::new("."));
-
-    for line in content.lines() {
-        let trimmed = line.trim();
-        // Check for GET command (case insensitive)
-        if trimmed.to_uppercase().starts_with("GET") {
-            let parts: Vec<&str> = trimmed.split_whitespace().collect();
-            if parts.len() >= 2 {
-                let lib_name = parts[1].replace("\"", "");
-                let lib_path = dir.join(format!("{}.hmr", lib_name));
-
-                match fs::read_to_string(&lib_path) {
-                    Ok(lib_content) => {
-                        println!("DEBUG: Successfully injected {} into source head.", lib_name);
-                        imports_code.push_str(&lib_content);
-                        imports_code.push('\n');
-                    }
-                    Err(_) => {
-                        eprintln!("COMPILER ERROR: Could not find library file at {:?}", lib_path);
-                        std::process::exit(1);
-                    }
-                }
-            }
-        } else {
-            main_body_code.push_str(line);
-            main_body_code.push('\n');
-        }
-    }
-
-    // Single-Pass rule: Definitions (Imports) MUST come before usage (Main Body)
-    format!("{}\n{}", imports_code, main_body_code)
-}
-
 fn main() {
+    // Collect CLI arguments: hamer <filename>
     let args: Vec<String> = env::args().collect();
+    
     if args.len() < 2 {
+        println!("H@mer Compiler v0.1");
         println!("Usage: hamer <file.hmr>");
-        return;
+        process::exit(1);
     }
 
-    let file_path = Path::new(&args[1]);
+    let file_path = &args[1];
     
-    // Read the file once
-    let raw_content = fs::read_to_string(file_path).expect("Unable to read source file");
-    
-    // 1. Resolve imports (ONLY ONCE)
-    // We pass raw_content here. It is moved into the function.
-    let full_content = resolve_imports(raw_content, file_path);
+    // 1. Read the H@mer source file
+    let input = fs::read_to_string(file_path).expect("Could not read source file");
 
-    // 2. Lexical Analysis
-    let mut lexer = Lexer::new(full_content);
+    println!("[H@mer] Tokenizing...");
+    // 2. Lexical Analysis (Tokens)
+    let mut lexer = Lexer::new(input);
     let mut tokens = Vec::new();
     loop {
-        let t = lexer.next_token();
-        tokens.push(t.clone());
-        if t == lexer::Token::EOF { break; }
+        let token = lexer.next_token();
+        if token == lexer::Token::EOF { break; }
+        tokens.push(token);
     }
 
-    // 3. Parsing
+    println!("[H@mer] Parsing AST...");
+    // 3. Syntax Analysis (Abstract Syntax Tree)
     let mut parser = Parser::new(tokens);
     let ast = parser.parse_program();
 
+    println!("[H@mer] Generating ARM64 Assembly...");
     // 4. Code Generation
-    let mut compiler = Generator::new();
-    let assembly = compiler.generate(ast);
-    
-    // 5. Output
-    fs::write("out.s", assembly).expect("Failed to write assembly file");
-    println!("H@mer: Compilation Successful.");
-}
+    let mut generator = Generator::new();
+    let assembly = generator.generate(ast);
 
+    // 5. Output to out.s (Assembly file)
+    fs::write("out.s", assembly).expect("Could not write assembly file");
+    
+    println!("[SUCCESS] compiled {} to out.s", file_path);
+    println!("Next steps:");
+    println!("  as out.s -o out.o");
+    println!("  ld out.o -o hamer_prog");
+}
